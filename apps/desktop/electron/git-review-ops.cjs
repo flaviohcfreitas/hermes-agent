@@ -639,6 +639,24 @@ async function repoStatus(repoPath, gitBin) {
     // No commits yet.
   }
 
+  // `git diff HEAD` ignores untracked files, so a turn that only creates new
+  // files (the common case — a fresh module, a demo dir) showed +0 in the rail
+  // while the review pane counted them. Fold untracked insertions into `added`
+  // so the rail matches reality. Bounded (size cap + concurrency) like the
+  // review tree; only the capped file slice is counted so a huge untracked tree
+  // can't stall the probe.
+  try {
+    const untracked = status.not_added.slice(0, 500)
+    for (let i = 0; i < untracked.length; i += UNTRACKED_LINE_COUNT_CONCURRENCY) {
+      const batch = await Promise.all(
+        untracked.slice(i, i + UNTRACKED_LINE_COUNT_CONCURRENCY).map(path => untrackedInsertions(cwd, path))
+      )
+      result.added += batch.reduce((sum, n) => sum + n, 0)
+    }
+  } catch {
+    // Best-effort: a probe failure just leaves untracked lines uncounted.
+  }
+
   return result
 }
 
