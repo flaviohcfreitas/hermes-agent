@@ -201,6 +201,72 @@ describe('mergeRepoWorktreeGroups (visual enhancer)', () => {
     expect(ci?.sessions).toHaveLength(1)
   })
 
+  it('re-anchors a lane whose path drifted from git truth back to its branch path', () => {
+    // The reported bug: a lane is correctly labeled by its branch (`bb/attempts`)
+    // but its stored PATH points at a stale/old worktree dir. git pins a branch
+    // to exactly one worktree, so the lane must follow the branch's real path —
+    // otherwise "reveal in Finder" opens a completely different worktree.
+    const repo = {
+      id: '/repo',
+      path: '/repo',
+      groups: [
+        lane({
+          id: '/repo/.worktrees/attempts',
+          label: 'bb/attempts',
+          isMain: false,
+          path: '/repo/.worktrees/attempts',
+          sessions: [makeSession('/repo/.worktrees/attempts')]
+        })
+      ]
+    }
+
+    // git now has `bb/attempts` at a sibling dir, not the stale `.worktrees` one.
+    const discovered: HermesGitWorktree[] = [
+      { branch: 'bb/attempts', detached: false, isMain: false, locked: false, path: '/repo-pr-attempts' }
+    ]
+
+    const merged = mergeRepoWorktreeGroups(repo, discovered)
+    const attempts = merged.filter(g => g.label === 'bb/attempts')
+
+    // Exactly one lane, re-pointed at git's real path (label preserved, sessions
+    // preserved), and NO leftover lane on the stale path.
+    expect(attempts).toHaveLength(1)
+    expect(attempts[0].path).toBe('/repo-pr-attempts')
+    expect(attempts[0].sessions).toHaveLength(1)
+    expect(merged.some(g => g.path === '/repo/.worktrees/attempts')).toBe(false)
+  })
+
+  it('collapses a re-anchored lane onto the real lane that already holds that path', () => {
+    // A stale lane (branch label, wrong path) AND the real worktree lane both
+    // exist. Re-anchoring the stale one onto git's path must not leave a twin —
+    // keep the richer (more sessions) lane.
+    const repo = {
+      id: '/repo',
+      path: '/repo',
+      groups: [
+        lane({ id: 'stale', label: 'bb/feature', isMain: false, path: '/repo/.worktrees/old', sessions: [] }),
+        lane({
+          id: '/repo-feature',
+          label: 'bb/feature',
+          isMain: false,
+          path: '/repo-feature',
+          sessions: [makeSession('/repo-feature'), makeSession('/repo-feature')]
+        })
+      ]
+    }
+
+    const discovered: HermesGitWorktree[] = [
+      { branch: 'bb/feature', detached: false, isMain: false, locked: false, path: '/repo-feature' }
+    ]
+
+    const merged = mergeRepoWorktreeGroups(repo, discovered)
+    const feature = merged.filter(g => g.path === '/repo-feature')
+
+    expect(feature).toHaveLength(1)
+    expect(feature[0].sessions).toHaveLength(2)
+    expect(merged.some(g => g.path === '/repo/.worktrees/old')).toBe(false)
+  })
+
   it('keeps the dir label for a detached-HEAD worktree (no branch to show)', () => {
     const repo = {
       id: '/repo',

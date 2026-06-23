@@ -305,6 +305,46 @@ export interface CreateProjectInput {
   color?: string
   boardSlug?: string
   use?: boolean
+  // Free-text project idea; written to IDEA.md at the primary folder on create.
+  idea?: string
+}
+
+// Generate a project idea via the stateless llm.oneshot RPC (inherits the live
+// session's model when one exists). Returns "" on failure so the caller can just
+// leave the field untouched. The "🎲" affordance in the new-project dialog.
+export async function generateProjectIdea(name: string): Promise<string> {
+  try {
+    const res = await gatewayRequest<{ text: string }>('llm.oneshot', {
+      instructions:
+        'You generate a single, concrete project idea as a short IDEA.md body: a one-line summary, ' +
+        'then 3-5 bullet goals. No preamble, no code fences, under 120 words.',
+      input: name.trim() ? `Project name: ${name.trim()}` : 'Surprise me with a fun project.',
+      temperature: 1.0
+    })
+
+    return (res.text || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+// Write IDEA.md to a project's primary folder (desktop only, best-effort). Local
+// fs write is hardened in the electron main; a remote backend / missing bridge
+// just skips it.
+async function writeProjectIdea(folder: null | string | undefined, idea: string): Promise<void> {
+  const dir = (folder || '').trim()
+  const body = idea.trim()
+  const write = window.hermesDesktop?.writeTextFile
+
+  if (!dir || !body || !write) {
+    return
+  }
+
+  try {
+    await write(`${dir.replace(/[/\\]+$/, '')}/IDEA.md`, body.endsWith('\n') ? body : `${body}\n`)
+  } catch {
+    // Best-effort: the project is created regardless of whether IDEA.md lands.
+  }
 }
 
 // ── Optimistic cache layer ───────────────────────────────────────────────────
@@ -381,6 +421,10 @@ export async function createProject(input: CreateProjectInput): Promise<ProjectI
   const created = res.project
 
   if (created) {
+    if (input.idea) {
+      void writeProjectIdea(created.primary_path ?? created.folders?.[0]?.path ?? input.primaryPath, input.idea)
+    }
+
     if (!$projects.get().some(proj => proj.id === created.id)) {
       $projects.set([...$projects.get(), created])
     }
@@ -615,6 +659,17 @@ export interface StartWorkSessionRequest {
 }
 
 export const $startWorkSessionRequest = atom<StartWorkSessionRequest | null>(null)
+
+// Keyboard-driven "spin up a new worktree" intent. The composer's coding rail
+// owns the name dialog (it has the active repo + branch context), so a global
+// hotkey just bumps this token; the rail opens its branch-off dialog in
+// response. A monotonic token re-fires even on repeat presses. No-ops off a
+// repo (the rail isn't mounted), which is the right "nothing to branch" outcome.
+export const $newWorktreeRequest = atom(0)
+
+export function requestNewWorktree(): void {
+  $newWorktreeRequest.set($newWorktreeRequest.get() + 1)
+}
 
 let startWorkToken = 0
 

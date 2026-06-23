@@ -25,6 +25,7 @@ import {
   switchToDefaultProfile,
   toggleShowAllProfiles
 } from '@/store/profile'
+import { requestNewWorktree } from '@/store/projects'
 import { toggleReview } from '@/store/review'
 import { setModelPickerOpen } from '@/store/session'
 import {
@@ -140,6 +141,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     ...sessionSlotHandlers,
     'session.focusSearch': requestSessionSearchFocus,
     'session.togglePin': deps.toggleSelectedPin,
+    'workspace.newWorktree': requestNewWorktree,
 
     'view.toggleSidebar': () => {
       if (matchesQuery(SIDEBAR_COLLAPSE_MEDIA_QUERY)) {

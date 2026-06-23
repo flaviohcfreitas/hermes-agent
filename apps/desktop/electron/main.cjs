@@ -6358,6 +6358,34 @@ ipcMain.handle('hermes:fs:rename', async (_event, targetPath, newName) => {
   return { path: dst }
 })
 
+// Write a small UTF-8 text file (e.g. a project's IDEA.md at creation). The path
+// is hardened (resolveRequestedPathForIpc) and the parent must already exist —
+// this never creates directory trees or escapes the allowed roots, and content
+// is size-capped so it can't be abused as a bulk-write primitive.
+ipcMain.handle('hermes:fs:writeText', async (_event, filePath, content) => {
+  const raw = String(filePath || '').trim()
+
+  if (!raw) {
+    throw new Error('Invalid path')
+  }
+
+  const text = String(content ?? '')
+
+  if (text.length > 1_000_000) {
+    throw new Error('Content too large')
+  }
+
+  const resolved = resolveRequestedPathForIpc(expandUserPath(raw), { purpose: 'Write text file' })
+
+  if (!directoryExists(path.dirname(resolved))) {
+    throw new Error('Parent directory does not exist')
+  }
+
+  await fs.promises.writeFile(resolved, text, 'utf8')
+
+  return { path: resolved }
+})
+
 // Move a file/folder to the OS trash (recoverable) — the VS Code "Delete"
 // default. `shell.trashItem` routes to Finder/Explorer/Files trash per platform.
 ipcMain.handle('hermes:fs:trash', async (_event, targetPath) => {

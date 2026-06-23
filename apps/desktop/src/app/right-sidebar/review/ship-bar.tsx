@@ -4,11 +4,11 @@ import { useState } from 'react'
 import { requestComposerSubmit } from '@/app/chat/composer/focus'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { GenerateButton } from '@/components/ui/generate-button'
 import { SplitButton } from '@/components/ui/split-button'
 import { Textarea } from '@/components/ui/textarea'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
-import { Square } from '@/lib/icons'
 import { notifyError } from '@/store/notifications'
 import {
   $reviewCommitDefault,
@@ -92,18 +92,16 @@ export function ReviewShipBar() {
           size="sm"
           value={message}
         />
-        <Tip label={generating ? c.stopGenerating : c.generateCommitMessage}>
-          <Button
-            aria-label={generating ? c.stopGenerating : c.generateCommitMessage}
-            className="absolute top-px right-px flex h-6 w-8 items-center justify-center rounded-l-none rounded-r-[2px] text-muted-foreground/80 hover:text-foreground"
-            disabled={!generating && !canGenerate}
-            onClick={generating ? cancelCommitMessage : runGenerate}
-            size="icon-xs"
-            variant="ghost"
-          >
-            {generating ? <Square className="fill-current" size={11} /> : <Codicon name="sparkle" size={ICON} />}
-          </Button>
-        </Tip>
+        <GenerateButton
+          className="absolute top-px right-px h-6 w-8 rounded-l-none rounded-r-[2px]"
+          disabled={!canGenerate}
+          generating={generating}
+          generatingLabel={c.stopGenerating}
+          iconSize={ICON}
+          label={c.generateCommitMessage}
+          onCancel={cancelCommitMessage}
+          onGenerate={runGenerate}
+        />
       </div>
 
       {/* Commit split (VS Code style). */}

@@ -112,10 +112,17 @@ export function useRepoWorktreeMap(
   return [map, loading]
 }
 
-// Persisted open/collapse for a repo/worktree node (absent = open). Lets a
-// project's folder layout auto-restore when you enter it, and survive reloads.
-export function useWorkspaceNodeOpen(id: string): [boolean, () => void] {
+// Persisted open/collapse for a repo/worktree node. Lets a project's folder
+// layout auto-restore when you enter it, and survive reloads.
+//
+// The persisted set is an OVERRIDE of `defaultOpen`, not an absolute "collapsed"
+// list: XOR lets one store serve both polarities. A default-open node (repo,
+// populated lane) lists collapses; a default-collapsed node (an EMPTY lane — no
+// sessions yet) instead records an explicit expand. So empty worktree/branch
+// lanes start collapsed and only open when the user clicks in.
+export function useWorkspaceNodeOpen(id: string, defaultOpen = true): [boolean, () => void] {
   const collapsed = useStore($sidebarWorkspaceCollapsedIds)
+  const overridden = collapsed.includes(id)
 
-  return [!collapsed.includes(id), () => toggleWorkspaceNodeCollapsed(id)]
+  return [defaultOpen ? !overridden : overridden, () => toggleWorkspaceNodeCollapsed(id)]
 }

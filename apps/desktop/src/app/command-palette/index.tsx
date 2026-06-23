@@ -20,6 +20,7 @@ import {
   Clock,
   Cpu,
   Download,
+  GitBranch,
   Globe,
   type IconComponent,
   Info,
@@ -40,8 +41,10 @@ import {
   Zap
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { $repoWorktrees } from '@/store/coding-status'
 import { $commandPaletteOpen, closeCommandPalette, setCommandPaletteOpen } from '@/store/command-palette'
 import { $bindings } from '@/store/keybinds'
+import { requestStartWorkSession } from '@/store/projects'
 import { runGatewayRestart } from '@/store/system-actions'
 import { luminance } from '@/themes/color'
 import { type ThemeMode, useTheme } from '@/themes/context'
@@ -208,6 +211,7 @@ export function CommandPalette() {
   const { t } = useI18n()
   const open = useStore($commandPaletteOpen)
   const bindings = useStore($bindings)
+  const worktrees = useStore($repoWorktrees)
   const navigate = useNavigate()
   const { availableThemes, resolvedMode, setMode, setTheme, themeName } = useTheme()
   const [search, setSearch] = useState('')
@@ -278,6 +282,30 @@ export function CommandPalette() {
     const settingsTab = (tab: string) => `${SETTINGS_ROUTE}?tab=${tab}`
     const cc = t.commandCenter
 
+    // The active repo's worktrees → "new conversation in <branch>". This is the
+    // ⌘K-typed "I want to work on <branch>" reflex: each entry seeds a fresh
+    // session anchored to that worktree's checkout (requestStartWorkSession),
+    // so git is the source of truth and edits land in the right tree.
+    const branchGroup: PaletteGroup[] =
+      worktrees.length > 0
+        ? [
+            {
+              heading: cc.branches,
+              items: worktrees.map(wt => {
+                const name = wt.branch?.trim() || wt.path.split('/').pop() || wt.path
+
+                return {
+                  icon: GitBranch,
+                  id: `worktree-${wt.path}`,
+                  keywords: ['branch', 'worktree', 'switch', name, wt.path],
+                  label: cc.startInBranch(name),
+                  run: () => requestStartWorkSession(wt.path)
+                }
+              })
+            }
+          ]
+        : []
+
     return [
       {
         heading: cc.goTo,
@@ -339,6 +367,7 @@ export function CommandPalette() {
           { action: 'nav.agents', icon: Cpu, id: 'nav-agents', label: t.agents.title, run: go(AGENTS_ROUTE) }
         ]
       },
+      ...branchGroup,
       {
         heading: cc.commandCenter,
         items: [
@@ -414,7 +443,7 @@ export function CommandPalette() {
         ]
       }
     ]
-  }, [go, settingsSectionLabel, t])
+  }, [go, settingsSectionLabel, t, worktrees])
 
   // The long, granular lists (settings fields, API keys, MCP servers, archived
   // chats) only surface once the user types — otherwise they'd bury the

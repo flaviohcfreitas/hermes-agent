@@ -74,6 +74,8 @@ export const KEYBIND_ACTIONS: readonly KeybindActionMeta[] = [
   ...SESSION_SLOT_ACTIONS,
   { id: 'session.focusSearch', category: 'session', defaults: ['mod+shift+f'] },
   { id: 'session.togglePin', category: 'session', defaults: [] },
+  // ⌘⇧B — "b" for branch: spin up a new git worktree from the active repo.
+  { id: 'workspace.newWorktree', category: 'session', defaults: ['mod+shift+b'] },
 
   // ── Navigation ───────────────────────────────────────────────────────────
   { id: 'nav.commandPalette', category: 'navigation', defaults: ['mod+k', 'mod+p'] },

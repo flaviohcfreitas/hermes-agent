@@ -72,6 +72,38 @@ const hoverProps = (index: number, paint: (index: number, on: boolean) => void) 
   onMouseLeave: () => paint(index, false)
 })
 
+// Constant-duration jump (eased), NOT native `behavior:'smooth'` — Chromium's
+// smooth scroll animates proportional to distance, so jumping across a long
+// thread crawls for seconds. A fixed ~260ms feels instant near or far. A
+// shared rAF handle cancels a prior jump so rapid tick clicks don't fight.
+let jumpRaf = 0
+
+function jumpScroll(viewport: HTMLElement, top: number, duration = 170): void {
+  cancelAnimationFrame(jumpRaf)
+  const start = viewport.scrollTop
+  const delta = top - start
+
+  if (Math.abs(delta) < 2) {
+    viewport.scrollTop = top
+
+    return
+  }
+
+  const t0 = performance.now()
+  const ease = (t: number) => 1 - (1 - t) ** 3 // easeOutCubic
+
+  const step = (now: number) => {
+    const p = Math.min(1, (now - t0) / duration)
+    viewport.scrollTop = start + delta * ease(p)
+
+    if (p < 1) {
+      jumpRaf = requestAnimationFrame(step)
+    }
+  }
+
+  jumpRaf = requestAnimationFrame(step)
+}
+
 function scrollToPrompt(id: string) {
   const viewport = document.querySelector<HTMLElement>(VIEWPORT)
   const node = viewport?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(id)}"]`)
@@ -83,7 +115,7 @@ function scrollToPrompt(id: string) {
   const top = viewport.scrollTop + (node.getBoundingClientRect().top - viewport.getBoundingClientRect().top) - 8
 
   triggerHaptic('selection')
-  viewport.scrollTo({ behavior: 'smooth', top: Math.max(0, top) })
+  jumpScroll(viewport, Math.max(0, top))
 }
 
 /** Right-edge prompt rail — hover previews, click to jump. ≥4 user turns only. */

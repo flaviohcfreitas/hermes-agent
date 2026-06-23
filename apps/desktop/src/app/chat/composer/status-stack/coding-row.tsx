@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { memo, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import { StatusRow } from '@/components/chat/status-row'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ import { useI18n } from '@/i18n'
 import { gitRef } from '@/lib/sanitize'
 import { $repoStatus, $repoWorktrees } from '@/store/coding-status'
 import { notifyError } from '@/store/notifications'
+import { $newWorktreeRequest } from '@/store/projects'
 
 // Tiny uppercase section header, matching the composer "+" menu's labels.
 const MENU_SECTION = 'text-[0.625rem] font-semibold uppercase tracking-wider text-(--ui-text-tertiary)'
@@ -76,6 +77,29 @@ export const CodingStatusRow = memo(function CodingStatusRow({
     setBranchName('')
     setTimeout(() => setBranchOpen(true), 0)
   }
+
+  // Global ⌘⇧B (workspace.newWorktree): open the name dialog for a worktree off
+  // current HEAD. The rail only renders inside a repo, so the hotkey naturally
+  // no-ops elsewhere. Guarded by a token ref so it fires on the keypress, not on
+  // mount or unrelated re-renders.
+  const worktreeReq = useStore($newWorktreeRequest)
+  const lastWorktreeReqRef = useRef(worktreeReq)
+
+  useEffect(() => {
+    if (worktreeReq === lastWorktreeReqRef.current) {
+      return
+    }
+
+    lastWorktreeReqRef.current = worktreeReq
+
+    if (!onBranchOff) {
+      return
+    }
+
+    setBranchBase(undefined)
+    setBranchName('')
+    setBranchOpen(true)
+  }, [onBranchOff, worktreeReq])
 
   const submitBranch = async () => {
     const branch = branchName.trim()

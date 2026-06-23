@@ -142,6 +142,10 @@ export function mergeRepoWorktreeGroups(
   // to the live branch from `git worktree list` so the sidebar matches the
   // composer's branch strip. Detached worktrees (no branch) keep their dir label.
   const liveBranchByPath = new Map<string, string>()
+  // Inverse: branch → its ONE live worktree path. git guarantees a branch is
+  // checked out in at most one worktree, so this mapping is a function and can
+  // re-anchor a lane whose stored path has drifted from git truth.
+  const livePathByBranch = new Map<string, string>()
 
   for (const worktree of discoveredWorktrees ?? []) {
     const wtPath = normalizePath(worktree.path)
@@ -149,25 +153,69 @@ export function mergeRepoWorktreeGroups(
 
     if (wtPath && branch && !worktree.detached) {
       liveBranchByPath.set(wtPath, branch)
+      livePathByBranch.set(branch.toLowerCase(), worktree.path.trim())
     }
   }
 
-  // Never relabel the main checkout's existing branch lanes: the repo root can
-  // have historical/session lanes for `main` while the same physical checkout is
-  // currently switched to `test0`. Those lanes share a path but represent
-  // different branch contexts, so the live checkout is injected below as its own
-  // empty/current lane when needed.
-  const relabel = (group: SidebarSessionGroup): SidebarSessionGroup => {
+  // Reconcile each linked lane against git truth so its label AND path describe
+  // the SAME worktree. Two repair directions:
+  //  1. Path git knows → relabel to that path's live branch (git UIs identify a
+  //     worktree by its checked-out branch, not the dir it lives in).
+  //  2. Path git DOESN'T know but the label IS a live branch → the lane's path
+  //     has gone stale (an old/recreated worktree dir). Re-anchor it to that
+  //     branch's real path. Without this, a lane reads `bb/attempts` while
+  //     "reveal in Finder" opens a different, stale checkout — the reported
+  //     "randomly wrong label / reveal opens a different worktree" bug.
+  // The main checkout is never reconciled: the repo root can keep historical
+  // `main` lanes while the physical checkout sits on another branch; the live
+  // root checkout is injected below as its own lane when needed.
+  const reconcile = (group: SidebarSessionGroup): SidebarSessionGroup => {
     if (group.isMain || group.isKanban) {
       return group
     }
 
-    const branch = liveBranchByPath.get(normalizePath(group.path))
+    const branchForPath = liveBranchByPath.get(normalizePath(group.path))
 
-    return branch && branch !== group.label ? { ...group, label: branch } : group
+    if (branchForPath) {
+      return branchForPath !== group.label ? { ...group, label: branchForPath } : group
+    }
+
+    const livePath = livePathByBranch.get(group.label.trim().toLowerCase())
+
+    if (livePath && normalizePath(livePath) !== normalizePath(group.path)) {
+      return { ...group, id: livePath, path: livePath }
+    }
+
+    return group
   }
 
-  const merged = repo.groups.map(relabel)
+  // Reconcile, then collapse any duplicate that the re-anchor produced (a stale
+  // lane re-pointed onto a path a real lane already holds) — keep the richer
+  // (more sessions) lane so no rows are lost.
+  const reconciled = repo.groups.map(reconcile)
+  const byPath = new Map<string, SidebarSessionGroup>()
+  const merged: SidebarSessionGroup[] = []
+
+  for (const group of reconciled) {
+    const key = !group.isMain && group.path ? normalizePath(group.path) : ''
+    const existing = key ? byPath.get(key) : undefined
+
+    if (existing) {
+      if (group.sessions.length > existing.sessions.length) {
+        merged[merged.indexOf(existing)] = group
+        byPath.set(key, group)
+      }
+
+      continue
+    }
+
+    if (key) {
+      byPath.set(key, group)
+    }
+
+    merged.push(group)
+  }
+
   const seenIds = new Set(merged.map(group => group.id))
   const seenPaths = new Set(merged.map(group => group.path).filter((path): path is string => Boolean(path)))
   // Dedupe by branch label too: a branch shows once even if it's checked out in

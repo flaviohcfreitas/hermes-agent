@@ -241,6 +241,7 @@ function RepoFlatSection({
         label={repo.label}
         onToggle={toggleOpen}
         open={open}
+        title={repo.path ?? undefined}
       />
       {open && <SidebarRowStack className="pl-2.5">{body}</SidebarRowStack>}
       {removeDialog}

@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { Codicon } from '@/components/ui/codicon'
 import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
+import { notifyError } from '@/store/notifications'
 import { newSessionInProfile } from '@/store/profile'
 import { switchBranchInRepo } from '@/store/projects'
-import { notifyError } from '@/store/notifications'
 
 import { countLabel, SidebarRowStack } from '../chrome'
 import { SidebarLoadMoreRow } from '../load-more-row'
@@ -28,7 +28,11 @@ export function SidebarWorkspaceGroup({ group, renderRows, onNewSession, onRemov
   const { t } = useI18n()
   const s = t.sidebar
   const isProfileGroup = group.mode === 'profile'
-  const [open, toggleOpen] = useWorkspaceNodeOpen(group.id)
+  // Empty worktree/branch lanes start collapsed — they only show a "No sessions
+  // yet" placeholder, so defaulting them open just adds noise. Profile lanes and
+  // lanes that already hold sessions default open.
+  const defaultOpen = isProfileGroup || group.sessions.length > 0
+  const [open, toggleOpen] = useWorkspaceNodeOpen(group.id, defaultOpen)
   const [visibleCount, setVisibleCount] = useState(SIDEBAR_GROUP_PAGE)
 
   const loadedCount = group.sessions.length
@@ -109,6 +113,7 @@ export function SidebarWorkspaceGroup({ group, renderRows, onNewSession, onRemov
         label={group.label}
         onToggle={toggleOpen}
         open={open}
+        title={group.path ?? undefined}
       />
       {open && (
         <>

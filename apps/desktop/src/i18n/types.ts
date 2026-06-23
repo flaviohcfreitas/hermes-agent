@@ -613,6 +613,8 @@ export interface Translations {
     searchPlaceholder: string
     goTo: string
     goToSession: string
+    branches: string
+    startInBranch: (branch: string) => string
     commandCenter: string
     appearance: string
     settings: string
@@ -932,6 +934,11 @@ export interface Translations {
       addFolderTitle: string
       namePlaceholder: string
       foldersLabel: string
+      ideaLabel: string
+      ideaPlaceholder: string
+      ideaGenerate: string
+      ideaGenerating: string
+      ideaShuffle: string
       noFolders: string
       addFolder: string
       primaryBadge: string

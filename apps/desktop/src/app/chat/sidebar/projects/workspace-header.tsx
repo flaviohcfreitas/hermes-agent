@@ -21,6 +21,24 @@ import { copyPath, revealPath, startWorkInRepo } from '@/store/projects'
 
 import { SidebarCount, SidebarRowLead } from '../chrome'
 
+// Branch/worktree labels routinely share a long prefix (`bb/coding-context-…`),
+// so plain end-truncation (`truncate`) hides exactly the suffix that tells two
+// lanes apart — both render as "bb/coding-context…". Keep the tail pinned and
+// ellipsize the HEAD instead, so `…context-facts-rpc` and `…context-persona`
+// stay distinguishable. Falls back to whole-string for short labels.
+function LaneLabel({ label, title }: { label: string; title?: string }) {
+  const tailLen = Math.min(14, Math.floor(label.length / 2))
+  const head = label.slice(0, label.length - tailLen)
+  const tail = label.slice(label.length - tailLen)
+
+  return (
+    <span className="flex min-w-0" title={title}>
+      <span className="truncate">{head}</span>
+      <span className="shrink-0 whitespace-pre">{tail}</span>
+    </span>
+  )
+}
+
 // "+" affordance shared by repo and worktree headers — reveals on header hover.
 export function WorkspaceAddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
@@ -181,7 +199,8 @@ export function WorkspaceHeader({
   icon,
   label,
   onToggle,
-  open
+  open,
+  title
 }: {
   action?: React.ReactNode
   count: React.ReactNode
@@ -190,6 +209,8 @@ export function WorkspaceHeader({
   label: string
   onToggle: () => void
   open: boolean
+  /** Hover tooltip — the lane's full on-disk path (worktree / repo root). */
+  title?: string
 }) {
   return (
     <div
@@ -207,7 +228,7 @@ export function WorkspaceHeader({
         type="button"
       >
         <SidebarRowLead>{icon}</SidebarRowLead>
-        <span className="min-w-0 truncate">{label}</span>
+        <LaneLabel label={label} title={title ? `${label}\n${title}` : label} />
         <span className="shrink-0">
           <SidebarCount>{count}</SidebarCount>
         </span>
