@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react'
-import type { ReactNode } from 'react'
+import type { ComponentProps } from 'react'
 
+import { TreeSkeleton } from '@/components/chat/skeletons'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
-import { Loader } from '@/components/ui/loader'
+import { useDelayedTrue } from '@/hooks/use-delayed-true'
 import { useI18n } from '@/i18n'
 import { selectDesktopPaths } from '@/lib/desktop-fs'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
@@ -218,8 +219,12 @@ function FilesystemTab({
   )
 }
 
-export function RightSidebarSectionHeader({ children }: { children: ReactNode }) {
-  return <div className="group/project-header flex h-7 shrink-0 items-center px-2.5">{children}</div>
+export function RightSidebarSectionHeader({ children, className, ...props }: ComponentProps<'div'>) {
+  return (
+    <div className={cn('group/project-header flex h-7 shrink-0 items-center px-2.5', className)} {...props}>
+      {children}
+    </div>
+  )
 }
 
 interface FileTreeBodyProps {
@@ -255,6 +260,9 @@ function FileTreeBody({
 }: FileTreeBodyProps) {
   const { t } = useI18n()
   const r = t.rightSidebar
+  // Stay blank for a beat, then skeleton — so a fast project switch doesn't
+  // flash a jarring loading state.
+  const showSkeleton = useDelayedTrue(loading && data.length === 0)
 
   if (!cwd) {
     return <EmptyState body={r.noProjectBody} title={r.noProjectTitle} />
@@ -278,7 +286,7 @@ function FileTreeBody({
   }
 
   if (loading && data.length === 0) {
-    return <FileTreeLoadingState />
+    return showSkeleton ? <FileTreeLoadingState /> : <div className="min-h-0 flex-1" />
   }
 
   if (data.length === 0) {
@@ -321,15 +329,8 @@ function FileTreeLoadingState() {
   const { t } = useI18n()
 
   return (
-    <div aria-label={t.rightSidebar.loadingTree} className="grid min-h-0 flex-1 place-items-center px-3" role="status">
-      <Loader
-        aria-hidden="true"
-        className="size-8 text-(--ui-text-tertiary)"
-        pathSteps={180}
-        role="presentation"
-        strokeScale={0.68}
-        type="spiral-search"
-      />
+    <div aria-label={t.rightSidebar.loadingTree} className="min-h-0 flex-1" role="status">
+      <TreeSkeleton />
     </div>
   )
 }
