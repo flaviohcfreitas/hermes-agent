@@ -197,6 +197,11 @@ COPY . .
 # resolution or downloads.
 RUN uv pip install --no-cache-dir --no-deps -e "."
 
+# MenosJuros: bake google-cloud-pubsub into the image so the Google Chat
+# gateway works out of the box (the [all] extra does not include it, and
+# Railway containers have no persistent first-boot lazy-install).
+RUN uv pip install --no-cache-dir google-cloud-pubsub
+
 # Keep /opt/hermes immutable for the runtime hermes user. Hosted/container
 # instances must not be able to self-edit the installed source or venv; user
 # data, skills, plugins, config, logs, and dashboard uploads live under
